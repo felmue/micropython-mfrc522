@@ -1,7 +1,3 @@
-from machine import Pin, SPI
-from os import uname
-
-
 class MFRC522:
 
 	OK = 0
@@ -13,46 +9,22 @@ class MFRC522:
 	AUTHENT1A = 0x60
 	AUTHENT1B = 0x61
 
-	def __init__(self, sck, mosi, miso, rst, cs):
-
-		self.sck = Pin(sck, Pin.OUT)
-		self.mosi = Pin(mosi, Pin.OUT)
-		self.miso = Pin(miso)
-		self.rst = Pin(rst, Pin.OUT)
-		self.cs = Pin(cs, Pin.OUT)
-
-		self.rst.value(0)
-		self.cs.value(1)
-		
-		board = uname()[0]
-
-		if board == 'WiPy' or board == 'LoPy' or board == 'FiPy':
-			self.spi = SPI(0)
-			self.spi.init(SPI.MASTER, baudrate=1000000, pins=(self.sck, self.mosi, self.miso))
-		elif board == 'esp8266':
-			self.spi = SPI(baudrate=100000, polarity=0, phase=0, sck=self.sck, mosi=self.mosi, miso=self.miso)
-			self.spi.init()
-		else:
-			raise RuntimeError("Unsupported platform")
-
-		self.rst.value(1)
+	def __init__(self, i2c_bus, address=0x28):
+		self._i2c = i2c_bus
+		self._address = address
 		self.init()
 
 	def _wreg(self, reg, val):
-
-		self.cs.value(0)
-		self.spi.write(b'%c' % int(0xff & ((reg << 1) & 0x7e)))
-		self.spi.write(b'%c' % int(0xff & val))
-		self.cs.value(1)
+		_buf = bytearray(2)
+		_buf[0] = reg & 0xFF
+		_buf[1] = val & 0xFF
+		self._i2c.writeto(self._address, _buf)
 
 	def _rreg(self, reg):
-
-		self.cs.value(0)
-		self.spi.write(b'%c' % int(0xff & (((reg << 1) & 0x7e) | 0x80)))
-		val = self.spi.read(1)
-		self.cs.value(1)
-
-		return val[0]
+		_buf = bytearray(1)
+		_buf[0] = reg & 0xFF
+		self._i2c.writeto(self._address, _buf)
+		return int.from_bytes(self._i2c.readfrom(self._address, 1), 'little')
 
 	def _sflags(self, reg, mask):
 		self._wreg(reg, self._rreg(reg) | mask)
@@ -149,6 +121,9 @@ class MFRC522:
 		self._wreg(0x15, 0x40)
 		self._wreg(0x11, 0x3D)
 		self.antenna_on()
+
+	def version(self):
+		return self._rreg(0x37)
 
 	def reset(self):
 		self._wreg(0x01, 0x0F)
