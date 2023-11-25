@@ -1,3 +1,7 @@
+# Copyright (c) 2016 Stefan Wendler (original work)
+# Copyright (c) 2023 by GWENDESIGN. All rights reserved.
+# Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
 class MFRC522:
 
 	OK = 0
